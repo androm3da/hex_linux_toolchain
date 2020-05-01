@@ -1,0 +1,60 @@
+name: Nightlies
+
+on:
+  push:
+  schedule:
+    - cron: '0 4 * * *'
+
+env:
+  ROOT_INSTALL: ./hex_rootfs/
+  TOOLCHAIN_INSTALL: ./hex_install/
+  RESULTS: ./hex_tests/
+  CCACHE_DIR: ${{ github.workspace }}/llvm_ccache
+  LLVM_VERSION: 9
+  PURGE_BUILDS: 1
+  MAKE_TARBALLS: 1
+  CMAKE_VER: 3.16.6
+  CMAKE_URL: https://github.com/Kitware/CMake/releases/download/v3.16.6/cmake-3.16.6-Linux-x86_64.tar.gz
+
+jobs:
+  build:
+    runs-on: ubuntu-16.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: ccache cache files
+        uses: actions/cache@v1.1.0
+        with:
+          path: ${{ github.workspace }}/llvm_ccache
+          key: llvm-${{ runner.os }}-master-${{ hashFiles('**/*.o') }}
+          restore-keys: |
+                  llvm-${{ runner.os }}-master-
+                  llvm-
+      - name: install clang, cmake
+        run: |
+                wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+                sudo add-apt-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-${LLVM_VERSION} main"
+                sudo apt-get update
+                sudo apt-get install --target-release llvm-toolchain-xenial-${LLVM_VERSION} clang-tidy-${LLVM_VERSION} libc++-${LLVM_VERSION}-dev
+                sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${LLVM_VERSION} 100
+                sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${LLVM_VERSION} 100
+                cd /tmp ; sudo wget ${CMAKE_URL}
+                cd /opt ; sudo tar xf /tmp/$(basename ${CMAKE_URL})
+                ln -sf cmake-${CMAKE_VER} cmake-latest
+                sudo sh -c 'echo "export PATH=/opt/cmake-latest/bin:\${PATH}" > /etc/profile.d/cmake-latest.sh'
+
+
+      - name: install deps
+        run:  sudo apt update -qq && sudo apt install -y -qq ccache ninja-build build-essential curl xz-utils cmake ninja-build python-dev flex bison libxml2-dev
+      - name: ccache init
+        run:  ccache --zero-stats ; ccache --show-stats || true
+      - name: get sources
+        run:  ./get_sources.sh
+      - name: build tools
+        run:  ./build_hex_tools.sh
+      - name: ccache summary
+        run:  ccache --show-stats || true
+      - name: Upload test results
+        uses: actions/upload-artifact@v2-preview
+        with:
+          name: hex_tests
+          path: hexagon_tests*.tar*
