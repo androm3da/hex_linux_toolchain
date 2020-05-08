@@ -21,3 +21,17 @@ wait
 wait
 wait
 wait
+
+dump_checkout_info() {
+	for d in ./*
+	do
+		if [[ -d ${d} ]]; then
+			cd ${d}
+			git show --stat
+			cd -
+		fi
+	done
+}
+
+mkdir -p ${RESULTS}
+dump_checkout_info 2>&1 | tee ${RESULTS}/git_checkouts.txt
