@@ -15,7 +15,6 @@ build_llvm_clang() {
 		-DLLVM_ENABLE_LIBCXX:BOOL=ON \
 		-DLLVM_ENABLE_ASSERTIONS:BOOL=ON \
 		-DLLVM_ENABLE_PIC:BOOL=OFF \
-		-DCLANG_ENABLE_PIC:BOOL=OFF \
 		-DLLVM_TARGETS_TO_BUILD:STRING="X86;Hexagon" \
 		-DLLVM_ENABLE_PROJECTS:STRING="clang;lld" \
 		../llvm-project/llvm
@@ -93,7 +92,6 @@ build_canadian_clang() {
     		-DLLVM_INCLUDE_UTILS:BOOL=OFF \
                 -DLLVM_ENABLE_BACKTRACE:BOOL=OFF \
                 -DLLVM_ENABLE_PIC:BOOL=OFF \
-                -DCLANG_ENABLE_PIC:BOOL=OFF \
 		-DLLVM_TARGETS_TO_BUILD:STRING="Hexagon" \
 		-DLLVM_ENABLE_PROJECTS:STRING="clang;lld" \
 		../llvm-project/llvm
@@ -146,6 +144,7 @@ build_musl_headers() {
 	cd ${BASE}
 	cd musl
 	make clean
+
 	CC=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/hexagon-unknown-linux-musl-clang \
 		CROSS_COMPILE=hexagon-unknown-linux-musl \
 	       	LIBCC=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/target/hexagon-unknown-linux-musl/lib/libclang_rt.builtins-hexagon.a \
@@ -161,6 +160,10 @@ build_musl() {
 	cd ${BASE}
 	cd musl
 	make clean
+
+#	fails w/ ./configure: error: unsupported long double type
+#	CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin -fno-rounding-math --target=hexagon-unknown-linux-musl" \
+
 	CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
 		RANLIB=llvm-ranlib \
@@ -181,7 +184,25 @@ build_musl() {
 test_libc() {
 	cd ${BASE}
 	cd libc-test
+	cat <<EOF >  config.mak
+CFLAGS += -pipe -std=c99 -D_POSIX_C_SOURCE=200809L -Wall -Wno-unused-function -Wno-missing-braces -Wno-unused -Wno-overflow
+CFLAGS += -Wno-unknown-pragmas -fno-builtin -frounding-math
+CFLAGS += -Werror=implicit-function-declaration -Werror=implicit-int -Werror=pointer-sign -Werror=pointer-arith
+CFLAGS += -g
+LDFLAGS += -g
+LDLIBS += -lpthread -lm -lrt
+
+# glibc specific settings
+CFLAGS += -D_FILE_OFFSET_BITS=64
+LDLIBS += -lcrypt -ldl -lresolv -lutil -lpthread
+
+# 'src/common/mtest.c' fails to build without -fno-rounding-math
+# https://bugs.llvm.org/show_bug.cgi?id=45329
+CFLAGS+=-G0 -O0 -mv65 -fno-builtin -fno-rounding-math --target=hexagon-unknown-linux-musl
+EOF
 	make clean
+
+	set +e
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/:$PATH \
 		CC=${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang \
 		QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE} \
@@ -189,8 +210,10 @@ test_libc() {
 		CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
 		RANLIB=llvm-ranlib \
-		RUN_WRAP=${TOOLCHAIN_BIN}/qemu-hexagon 2>&1 | tee ${RESULTS_DIR}/libc_test_results.txt || /bin/true
-	cp src/REPORT ${RESULTS_DIR}/
+		RUN_WRAP=${TOOLCHAIN_BIN}/qemu-hexagon 2>&1 | tee ${RESULTS_DIR}/libc_test_detail.log
+	libc_result=${?}
+	set -e
+	cp src/REPORT ${RESULTS_DIR}/libc_test_REPORT
 }
 
 build_libcxx() {
@@ -273,10 +296,6 @@ build_qemu() {
 #		--cross-cc-cflags-hexagon="-mv67 --sysroot=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/target/hexagon-unknown-linux-musl"
 
 	make -j
-	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin:$PATH \
-		QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE} \
-		CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin -fno-rounding-math" \
-		make check-tcg TIMEOUT=180 CROSS_CC_GUEST=hexagon-unknown-linux-musl-clang V=1 --keep-going 2>&1 | tee ${RESULTS_DIR}/qemu_test.log || /bin/true
 	make -j install
 
 	cat <<EOF > ./qemu_wrapper.sh
@@ -289,6 +308,20 @@ export QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE}
 ${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/qemu-hexagon \$*
 EOF
 	chmod +x ./qemu_wrapper.sh
+}
+
+test_qemu() {
+	cd ${BASE}
+	cd obj_qemu
+
+
+	set +e
+	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin:$PATH \
+		QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE} \
+		CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin -fno-rounding-math" \
+		make check-tcg TIMEOUT=180 CROSS_CC_GUEST=hexagon-unknown-linux-musl-clang V=1 --keep-going 2>&1 | tee ${RESULTS_DIR}/qemu_test.log
+	set -e
+	qemu_result=${?}
 }
 
 test_llvm() {
@@ -409,12 +442,16 @@ build_musl
 
 build_qemu
 
+qemu_result=99
+test_qemu
+
 build_libunwind
 build_libcxxabi
 build_libcxx
 
 cp -ra ${HEX_SYSROOT}/usr ${ROOTFS}/
 
+# needs google benchmark changes to count hexagon cycles in order to build:
 #test_llvm
 
 # Recipe still needs tweaks:
@@ -430,8 +467,9 @@ if [[ ${MAKE_TARBALLS-0} -eq 1 ]]; then
     XZ_OPT="-8 --threads=0" tar cJf ${BASE}/hexagon_tools_install_$(date +"%Y_%b_%d").tar.xz -C $(dirname ${TOOLCHAIN_INSTALL_REL}) $(basename ${TOOLCHAIN_INSTALL_REL})
 fi
 
+libc_result=99
 # Assertion building src/common/mtest.c:
-#test_libc
+test_libc
 
 # Needs patch to avoid reloc error:
 #build_kernel
@@ -448,3 +486,4 @@ if [[ ${MAKE_TARBALLS-0} -eq 1 ]]; then
 fi
 
 echo done
+exit $(( ${libc_result} + ${qemu_result} ))
