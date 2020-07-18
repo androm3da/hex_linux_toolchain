@@ -148,7 +148,7 @@ build_musl_headers() {
 	CC=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/hexagon-unknown-linux-musl-clang \
 		CROSS_COMPILE=hexagon-unknown-linux-musl \
 	       	LIBCC=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/target/hexagon-unknown-linux-musl/lib/libclang_rt.builtins-hexagon.a \
-		CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin -fno-rounding-math --target=hexagon-unknown-linux-musl" \
+		CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl" \
 		./configure --target=hexagon --prefix=${HEX_TOOLS_TARGET_BASE}
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/:$PATH make CROSS_COMPILE= install-headers
 
@@ -162,7 +162,7 @@ build_musl() {
 	make clean
 
 #	fails w/ ./configure: error: unsupported long double type
-#	CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin -fno-rounding-math --target=hexagon-unknown-linux-musl" \
+#	CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl" \
 
 	CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
@@ -170,7 +170,7 @@ build_musl() {
 		STRIP=llvm-strip \
 	       	CC=clang \
 	       	LIBCC=${HEX_TOOLS_TARGET_BASE}/lib/libclang_rt.builtins-hexagon.a \
-		CFLAGS="-G0 -O0 -mv65 -fno-builtin -fno-rounding-math --target=hexagon-unknown-linux-musl" \
+		CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl" \
 		./configure --target=hexagon --prefix=${HEX_TOOLS_TARGET_BASE}
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/:$PATH make -j CROSS_COMPILE= install
 	cd ${HEX_TOOLS_TARGET_BASE}/lib
@@ -184,22 +184,6 @@ build_musl() {
 test_libc() {
 	cd ${BASE}
 	cd libc-test
-	cat <<EOF >  config.mak
-CFLAGS += -pipe -std=c99 -D_POSIX_C_SOURCE=200809L -Wall -Wno-unused-function -Wno-missing-braces -Wno-unused -Wno-overflow
-CFLAGS += -Wno-unknown-pragmas -fno-builtin -frounding-math
-CFLAGS += -Werror=implicit-function-declaration -Werror=implicit-int -Werror=pointer-sign -Werror=pointer-arith
-CFLAGS += -g
-LDFLAGS += -g
-LDLIBS += -lpthread -lm -lrt
-
-# glibc specific settings
-CFLAGS += -D_FILE_OFFSET_BITS=64
-LDLIBS += -lcrypt -ldl -lresolv -lutil -lpthread
-
-# 'src/common/mtest.c' fails to build without -fno-rounding-math
-# https://bugs.llvm.org/show_bug.cgi?id=45329
-CFLAGS+=-G0 -O0 -mv65 -fno-builtin -fno-rounding-math --target=hexagon-unknown-linux-musl
-EOF
 	make clean
 
 	set +e
@@ -216,71 +200,40 @@ EOF
 	cp src/REPORT ${RESULTS_DIR}/libc_test_REPORT
 }
 
-build_libcxx() {
+build_libs() {
 	cd ${BASE}
-	mkdir -p obj_libcxx
-	cd obj_libcxx
+	mkdir -p obj_libs
+	cd obj_libs
 	cmake -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_CONFIG_PATH:PATH=../obj_llvm/bin/llvm-config \
-		-DCMAKE_C_FLAGS:STRING="-nostdlib" \
-		-DCMAKE_CXX_FLAGS:STRING="-nostdlib" \
 		-DCMAKE_SYSTEM_NAME:STRING=Linux \
+		-DCMAKE_EXE_LINKER_FLAGS:STRING="-lclang_rt.builtins-hexagon -nostdlib" \
+		-DCMAKE_SHARED_LINKER_FLAGS:STRING="-lclang_rt.builtins-hexagon -nostdlib" \
 		-DCMAKE_C_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
 		-DCMAKE_CXX_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang++" \
+		-DCMAKE_ASM_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
+		-DLLVM_INCLUDE_BENCHMARKS:BOOL=OFF \
+		-DLLVM_BUILD_BENCHMARKS:BOOL=OFF \
+		-DLLVM_INCLUDE_RUNTIMES:BOOL=OFF \
+		-DLLVM_ENABLE_PROJECTS:STRING="libcxx;libcxxabi;libunwind" \
+		-DLLVM_ENABLE_LIBCXX:BOOL=ON \
+		-DLLVM_BUILD_RUNTIME:BOOL=ON \
 		-DCMAKE_INSTALL_PREFIX:PATH=${HEX_TOOLS_TARGET_BASE} \
 		-DCMAKE_CROSSCOMPILING:BOOL=ON \
+		-DHAVE_CXX_ATOMICS_WITHOUT_LIB:BOOL=ON \
+		-DHAVE_CXX_ATOMICS64_WITHOUT_LIB:BOOL=ON \
 		-DLIBCXX_HAS_MUSL_LIBC:BOOL=ON \
 		-DLIBCXX_INCLUDE_TESTS:BOOL=OFF \
 		-DLIBCXX_CXX_ABI=libcxxabi \
-		../llvm-project/libcxx
-	cat CMakeFiles/CMake*.log
-#	ninja check-cxx || /bin/true
-	ninja -v install-cxx
-}
-
-build_libunwind() {
-	cd ${BASE}
-	mkdir -p obj_libunwind
-	cd obj_libunwind
-	cmake -G Ninja \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DLLVM_CONFIG_PATH:PATH=../obj_llvm/bin/llvm-config \
-		-DCMAKE_C_FLAGS:STRING="-nostdlib" \
-		-DCMAKE_CXX_FLAGS:STRING="-nostdlib" \
-		-DCMAKE_EXE_LINKER_FLAGS:STRING="-lclang_rt.builtins-hexagon -nostdlib" \
-		-DCMAKE_SHARED_LINKER_FLAGS:STRING="-lclang_rt.builtins-hexagon -nostdlib" \
-		-DCMAKE_SYSTEM_NAME:STRING=Linux \
-		-DCMAKE_C_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
-		-DCMAKE_ASM_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
-		-DCMAKE_CXX_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang++" \
-		-DCMAKE_INSTALL_PREFIX:PATH=${HEX_TOOLS_TARGET_BASE} \
-		-DCMAKE_CROSSCOMPILING:BOOL=ON \
-		-DLLVM_ENABLE_LIBCXX:BOOL=ON \
-		../llvm-project/libunwind
-	ninja -v install-unwind
-}
-
-
-build_libcxxabi() {
-	cd ${BASE}
-	mkdir -p obj_libcxxabi
-	cd obj_libcxxabi
-	cmake -G Ninja \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DLLVM_CONFIG_PATH:PATH=../obj_llvm/bin/llvm-config \
-		-DCMAKE_SYSTEM_NAME:STRING=Linux \
-		-DCMAKE_C_FLAGS:STRING="-nostdlib" \
-		-DCMAKE_CXX_FLAGS:STRING="-nostdlib" \
-		-DCMAKE_CXX_COMPILER:STRING="${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/hexagon-unknown-linux-musl-clang++" \
-		-DCMAKE_INSTALL_PREFIX:PATH=${HEX_TOOLS_TARGET_BASE} \
-		-DCMAKE_CROSSCOMPILING:BOOL=ON \
 		-DLIBCXXABI_USE_LLVM_UNWINDER=ON \
 		-DLIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL=OFF \
 		-DLIBCXXABI_ENABLE_SHARED:BOOL=ON \
-		../llvm-project/libcxxabi
-#	ninja check-cxxabi || /bin/true
+		-DCMAKE_CXX_COMPILER_FORCED:BOOL=ON \
+		../llvm-project/llvm
+	ninja -v install-unwind
 	ninja -v install-cxxabi
+	ninja -v install-cxx
 }
 
 build_qemu() {
@@ -318,10 +271,10 @@ test_qemu() {
 	set +e
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin:$PATH \
 		QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE} \
-		CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin -fno-rounding-math" \
+		CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin" \
 		make check-tcg TIMEOUT=180 CROSS_CC_GUEST=hexagon-unknown-linux-musl-clang V=1 --keep-going 2>&1 | tee ${RESULTS_DIR}/qemu_test.log
-	set -e
 	qemu_result=${?}
+	set -e
 }
 
 test_llvm() {
@@ -445,9 +398,8 @@ build_qemu
 qemu_result=99
 test_qemu
 
-build_libunwind
-build_libcxxabi
-build_libcxx
+
+build_libs
 
 cp -ra ${HEX_SYSROOT}/usr ${ROOTFS}/
 
@@ -455,6 +407,8 @@ cp -ra ${HEX_SYSROOT}/usr ${ROOTFS}/
 #test_llvm
 
 # Recipe still needs tweaks:
+#	ld.lld: error: crt1.c:(function _start_c: .text._start_c+0x5C): relocation R_HEX_B22_PCREL out of range: 2688980 is not in [-2097152, 2097151]; references __libc_start_main
+#	>>> defined in ... hexagon-unknown-linux-musl/usr/lib/libc.so
 #build_canadian_clang
 
 # In order to have enough space on hosted environments to make the tarballs we may need to cleanup at this stage
