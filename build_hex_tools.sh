@@ -194,7 +194,7 @@ test_libc() {
 		CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
 		RANLIB=llvm-ranlib \
-		RUN_WRAP=${TOOLCHAIN_BIN}/qemu-hexagon 2>&1 | tee ${RESULTS_DIR}/libc_test_detail.log
+		RUN_WRAP=${TOOLCHAIN_BIN}/qemu_wrapper.sh 2>&1 | tee ${RESULTS_DIR}/libc_test_detail.log
 	libc_result=${?}
 	set -e
 	cp src/REPORT ${RESULTS_DIR}/libc_test_REPORT
@@ -258,7 +258,7 @@ set -euo pipefail
 
 export QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE}
 
-${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/qemu-hexagon \$*
+exec ${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/qemu-hexagon \$*
 EOF
 	chmod +x ./qemu_wrapper.sh
 }
@@ -267,14 +267,12 @@ test_qemu() {
 	cd ${BASE}
 	cd obj_qemu
 
-
-	set +e
+	make check V=1 --keep-going 2>&1 | tee ${RESULTS_DIR}/qemu_test_check.log
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin:$PATH \
 		QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE} \
 		CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin" \
-		make check-tcg TIMEOUT=180 CROSS_CC_GUEST=hexagon-unknown-linux-musl-clang V=1 --keep-going 2>&1 | tee ${RESULTS_DIR}/qemu_test.log
+		make check-tcg TIMEOUT=180 CROSS_CC_GUEST=hexagon-unknown-linux-musl-clang V=1 --keep-going 2>&1 | tee ${RESULTS_DIR}/qemu_test_check-tcg.log
 	qemu_result=${?}
-	set -e
 }
 
 test_llvm() {
