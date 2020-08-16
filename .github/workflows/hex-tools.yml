@@ -13,8 +13,8 @@ env:
   LLVM_VERSION: 9
   PURGE_BUILDS: 1
   MAKE_TARBALLS: 1
-  CMAKE_VER: 3.16.6
-  CMAKE_URL: https://github.com/Kitware/CMake/releases/download/v3.16.6/cmake-3.16.6-Linux-x86_64.tar.gz
+  CMAKE_VER: 3.17.3
+  CMAKE_URL: https://github.com/Kitware/CMake/releases/download/v3.17.3/cmake-3.17.3-Linux-x86_64.tar.gz
 
 jobs:
   build:
