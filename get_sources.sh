@@ -22,13 +22,15 @@ wait
 wait
 wait
 
+cd llvm-project; git checkout llvmorg-11.0.0
+
 dump_checkout_info() {
 	for d in ./*
 	do
 		if [[ -d ${d} ]]; then
 			cd ${d}
 			echo ${d}:
-			git show --stat
+			git show --pretty=short --stat
 			echo -e '\n\n\n'
 			cd -
 		fi
