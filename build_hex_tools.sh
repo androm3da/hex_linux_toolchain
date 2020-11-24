@@ -260,7 +260,8 @@ export QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE}
 
 exec ${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/qemu-hexagon \$*
 EOF
-	chmod +x ./qemu_wrapper.sh
+	cp ./qemu_wrapper.sh ${TOOLCHAIN_BIN}/
+	chmod +x ./qemu_wrapper.sh ${TOOLCHAIN_BIN}/qemu_wrapper.sh
 }
 
 test_qemu() {
@@ -284,7 +285,7 @@ test_llvm() {
 		-DCMAKE_BUILD_TYPE=Release \
 		-C../llvm-test-suite/cmake/caches/O3.cmake \
 		-DTEST_SUITE_CXX_ABI:STRING=libc++abi \
-		-DTEST_SUITE_RUN_UNDER:STRING="${BASE}/obj_qemu/qemu_wrapper.sh" \
+		-DTEST_SUITE_RUN_UNDER:STRING="${TOOLCHAIN_BIN}/qemu_wrapper.sh" \
 		-DTEST_SUITE_RUN_BENCHMARKS:BOOL=ON \
 		-DTEST_SUITE_LIT_FLAGS:STRING="--max-tests=10" \
 		-DTEST_SUITE_LIT:FILEPATH="${BASE}/obj_llvm/bin/llvm-lit" \
