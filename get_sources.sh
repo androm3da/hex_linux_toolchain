@@ -28,7 +28,9 @@ dump_checkout_info() {
 		if [[ -d ${d} ]]; then
 			cd ${d}
 			echo ${d}:
-			git show --stat
+			git show --stat > ./tmp
+			head -n 200 ./tmp
+			rm ./tmp
 			echo -e '\n\n\n'
 			cd -
 		fi
