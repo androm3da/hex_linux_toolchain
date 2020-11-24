@@ -163,14 +163,13 @@ build_musl() {
 
 #	fails w/ ./configure: error: unsupported long double type
 #	CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl" \
-
 	CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
 		RANLIB=llvm-ranlib \
 		STRIP=llvm-strip \
 	       	CC=clang \
 	       	LIBCC=${HEX_TOOLS_TARGET_BASE}/lib/libclang_rt.builtins-hexagon.a \
-		CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl" \
+		CFLAGS="${MUSL_CFLAGS}" \
 		./configure --target=hexagon --prefix=${HEX_TOOLS_TARGET_BASE}
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/:$PATH make -j CROSS_COMPILE= install
 	cd ${HEX_TOOLS_TARGET_BASE}/lib
@@ -190,6 +189,7 @@ test_libc() {
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/:$PATH \
 		CC=${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang \
 		QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE} \
+		CFLAGS="${MUSL_CFLAGS}" \
 		make V=1 \
 		CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
@@ -241,6 +241,7 @@ build_qemu() {
 	mkdir -p obj_qemu
 	cd obj_qemu
 	../qemu/configure --disable-fdt --disable-capstone --disable-guest-agent \
+	                  --disable-containers \
 		--target-list=hexagon-linux-user --prefix=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu \
 
 #	--cc=clang \
@@ -260,7 +261,8 @@ export QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE}
 
 exec ${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/qemu-hexagon \$*
 EOF
-	chmod +x ./qemu_wrapper.sh
+	cp ./qemu_wrapper.sh ${TOOLCHAIN_BIN}/
+	chmod +x ./qemu_wrapper.sh ${TOOLCHAIN_BIN}/qemu_wrapper.sh
 }
 
 test_qemu() {
@@ -284,7 +286,7 @@ test_llvm() {
 		-DCMAKE_BUILD_TYPE=Release \
 		-C../llvm-test-suite/cmake/caches/O3.cmake \
 		-DTEST_SUITE_CXX_ABI:STRING=libc++abi \
-		-DTEST_SUITE_RUN_UNDER:STRING="${BASE}/obj_qemu/qemu_wrapper.sh" \
+		-DTEST_SUITE_RUN_UNDER:STRING="${TOOLCHAIN_BIN}/qemu_wrapper.sh" \
 		-DTEST_SUITE_RUN_BENCHMARKS:BOOL=ON \
 		-DTEST_SUITE_LIT_FLAGS:STRING="--max-tests=10" \
 		-DTEST_SUITE_LIT:FILEPATH="${BASE}/obj_llvm/bin/llvm-lit" \
@@ -383,6 +385,14 @@ RESULTS_DIR=$(readlink -f ${RESULTS})
 BASE=$(readlink -f ${PWD})
 
 mkdir -p ${RESULTS_DIR}
+
+MUSL_CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl"
+
+# Workaround, 'C()' macro results in switch over bool:
+MUSL_CFLAGS="${MUSL_CFLAGS} -Wno-switch-bool"
+# Workaround, this looks like a bug/incomplete feature in the
+# hexagon compiler backend:
+MUSL_CFLAGS="${MUSL_CFLAGS} -Wno-unsupported-floating-point-opt"
 
 build_llvm_clang
 config_kernel
