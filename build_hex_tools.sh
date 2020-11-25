@@ -163,14 +163,6 @@ build_musl() {
 
 #	fails w/ ./configure: error: unsupported long double type
 #	CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl" \
-	MUSL_CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl"
-
-	# workaround, 'C()' macro results in switch over bool:
-	MUSL_CFLAGS="${MUSL_CFLAGS} -Wno-switch-bool"
-	# workaround, this looks like a bug/incomplete feature in the
-	# hexagon compiler backend:
-	MUSL_CFLAGS="${MUSL_CFLAGS} -Wno-unsupported-floating-point-opt"
-
 	CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
 		RANLIB=llvm-ranlib \
@@ -197,6 +189,7 @@ test_libc() {
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/:$PATH \
 		CC=${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang \
 		QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE} \
+		CFLAGS="${MUSL_CFLAGS}" \
 		make V=1 \
 		CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
@@ -248,6 +241,7 @@ build_qemu() {
 	mkdir -p obj_qemu
 	cd obj_qemu
 	../qemu/configure --disable-fdt --disable-capstone --disable-guest-agent \
+	                  --disable-containers \
 		--target-list=hexagon-linux-user --prefix=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu \
 
 #	--cc=clang \
@@ -391,6 +385,14 @@ RESULTS_DIR=$(readlink -f ${RESULTS})
 BASE=$(readlink -f ${PWD})
 
 mkdir -p ${RESULTS_DIR}
+
+MUSL_CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl"
+
+# Workaround, 'C()' macro results in switch over bool:
+MUSL_CFLAGS="${MUSL_CFLAGS} -Wno-switch-bool"
+# Workaround, this looks like a bug/incomplete feature in the
+# hexagon compiler backend:
+MUSL_CFLAGS="${MUSL_CFLAGS} -Wno-unsupported-floating-point-opt"
 
 build_llvm_clang
 config_kernel
