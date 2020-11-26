@@ -28,7 +28,7 @@ dump_checkout_info() {
 		if [[ -d ${d} ]]; then
 			cd ${d}
 			echo ${d}:
-			git show
+			git show --summary --no-notes
 			echo -e '\n\n\n'
 			cd -
 		fi
