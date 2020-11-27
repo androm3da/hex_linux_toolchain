@@ -169,7 +169,7 @@ build_musl() {
 		STRIP=llvm-strip \
 	       	CC=clang \
 	       	LIBCC=${HEX_TOOLS_TARGET_BASE}/lib/libclang_rt.builtins-hexagon.a \
-		CFLAGS="${MUSL_CFLAGS}" \
+		CROSS_CFLAGS="${MUSL_CFLAGS}" \
 		./configure --target=hexagon --prefix=${HEX_TOOLS_TARGET_BASE}
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/:$PATH make -j CROSS_COMPILE= install
 	cd ${HEX_TOOLS_TARGET_BASE}/lib
