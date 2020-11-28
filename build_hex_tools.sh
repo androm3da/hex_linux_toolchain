@@ -161,15 +161,13 @@ build_musl() {
 	cd musl
 	make clean
 
-#	fails w/ ./configure: error: unsupported long double type
-#	CROSS_CFLAGS="-G0 -O0 -mv65 -fno-builtin  --target=hexagon-unknown-linux-musl" \
 	CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
 		RANLIB=llvm-ranlib \
 		STRIP=llvm-strip \
 	       	CC=clang \
 	       	LIBCC=${HEX_TOOLS_TARGET_BASE}/lib/libclang_rt.builtins-hexagon.a \
-		CROSS_CFLAGS="${MUSL_CFLAGS}" \
+		CFLAGS="${MUSL_CFLAGS}" \
 		./configure --target=hexagon --prefix=${HEX_TOOLS_TARGET_BASE}
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/:$PATH make -j CROSS_COMPILE= install
 	cd ${HEX_TOOLS_TARGET_BASE}/lib
