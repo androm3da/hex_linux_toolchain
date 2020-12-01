@@ -180,22 +180,29 @@ build_musl() {
 
 test_libc() {
 	cd ${BASE}
-	cd libc-test
-	make clean
+	mkdir -p obj_libc-test/
+	cd obj_libc-test
+
+	rm -f ../libc-test/config.mak
+	cat ../libc-test/config.mak.def - <<EOF >> ../libc-test/config.mak
+CFLAGS+=${MUSL_CFLAGS}
+EOF
 
 	set +e
 	PATH=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/:$PATH \
 		CC=${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang \
 		QEMU_LD_PREFIX=${HEX_TOOLS_TARGET_BASE} \
-		CFLAGS="${MUSL_CFLAGS}" \
 		make V=1 \
+		--directory=../libc-test \
+		B=${PWD} \
 		CROSS_COMPILE=hexagon-unknown-linux-musl- \
 		AR=llvm-ar \
 		RANLIB=llvm-ranlib \
-		RUN_WRAP=${TOOLCHAIN_BIN}/qemu_wrapper.sh 2>&1 | tee ${RESULTS_DIR}/libc_test_detail.log
+		RUN_WRAP=${TOOLCHAIN_BIN}/qemu_wrapper.sh
 	libc_result=${?}
 	set -e
-	cp src/REPORT ${RESULTS_DIR}/libc_test_REPORT
+	cp ./REPORT ${RESULTS_DIR}/libc_test_REPORT
+	head ./REPORT $(find ${PWD} -name '*.err' | sort) > ${RESULTS_DIR}/libc_test_failures_err.log
 }
 
 build_libs() {
@@ -428,8 +435,7 @@ if [[ ${MAKE_TARBALLS-0} -eq 1 ]]; then
 fi
 
 libc_result=99
-# Assertion building src/common/mtest.c:
-test_libc
+test_libc 2>&1 | tee ${RESULTS_DIR}/libc_test_detail.log
 
 # Needs patch to avoid reloc error:
 #build_kernel
