@@ -452,4 +452,7 @@ if [[ ${MAKE_TARBALLS-0} -eq 1 ]]; then
 fi
 
 echo done
-exit $(( ${libc_result} + ${qemu_result} ))
+echo libc: ${libc_result}
+echo qemu: ${qemu_result}
+exit ${qemu_result}
+#exit $(( ${libc_result} + ${qemu_result} ))
