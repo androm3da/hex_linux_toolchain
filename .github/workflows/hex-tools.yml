@@ -10,7 +10,7 @@ env:
   TOOLCHAIN_INSTALL: ./hex_install/
   RESULTS: ./hex_tests/
   CCACHE_DIR: ${{ github.workspace }}/llvm_ccache
-  LLVM_VERSION: 9
+  LLVM_VERSION: 10
   PURGE_BUILDS: 1
   MAKE_TARBALLS: 1
   CMAKE_VER: 3.16.6
@@ -18,7 +18,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
       - name: ccache cache files
@@ -32,9 +32,9 @@ jobs:
       - name: install clang, cmake
         run: |
                 wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-                sudo add-apt-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-${LLVM_VERSION} main"
+                sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-${LLVM_VERSION} main"
                 sudo apt-get update
-                sudo apt-get install --target-release llvm-toolchain-xenial-${LLVM_VERSION} clang-tidy-${LLVM_VERSION} libc++-${LLVM_VERSION}-dev
+                sudo apt-get install --target-release llvm-toolchain-bionic-${LLVM_VERSION} clang-tidy-${LLVM_VERSION} libc++-${LLVM_VERSION}-dev
                 sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${LLVM_VERSION} 100
                 sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${LLVM_VERSION} 100
                 cd /tmp ; sudo wget ${CMAKE_URL}
