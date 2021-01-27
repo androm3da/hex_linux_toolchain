@@ -59,3 +59,9 @@ jobs:
         with:
           name: hex_tests
           path: hex_tests/
+      - name: Upload root filesystem
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2-preview
+        with:
+          name: hex_rootfs
+          path: hex_rootfs/
