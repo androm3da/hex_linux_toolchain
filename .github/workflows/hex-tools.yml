@@ -55,7 +55,7 @@ jobs:
         run:  ccache --show-stats || true
       - name: Upload test results
         if: ${{ always() }}
-        uses: actions/upload-artifact@v2-preview
+        uses: actions/upload-artifact@v2
         with:
           name: hex_tests
           path: |
