@@ -58,4 +58,6 @@ jobs:
         uses: actions/upload-artifact@v2-preview
         with:
           name: hex_tests
-          path: hex_tests/
+          path: |
+            hex_tests/
+            obj_qemu/tests/tcg/
