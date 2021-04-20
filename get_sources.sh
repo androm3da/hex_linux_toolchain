@@ -22,6 +22,8 @@ wait
 wait
 wait
 
+cd llvm-project; git checkout llvmorg-12.0.0
+
 dump_checkout_info() {
 	for d in ./*
 	do
