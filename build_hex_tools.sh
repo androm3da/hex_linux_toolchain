@@ -16,6 +16,11 @@ build_llvm_clang() {
 		-DLLVM_ENABLE_ASSERTIONS:BOOL=ON \
 		-DLLVM_ENABLE_PIC:BOOL=OFF \
 		-DLLVM_TARGETS_TO_BUILD:STRING="X86;Hexagon" \
+		-DLLVM_DEFAULT_TARGET_TRIPLE:STRING="hexagon-unknown-musl-linux" \
+		-DCLANG_DEFAULT_CXX_STDLIB:STRING="libc++" \
+		-DCLANG_DEFAULT_OBJCOPY:STRING="llvm-objcopy" \
+		-DCLANG_DEFAULT_LINKER:STRING="lld" \
+		-DDEFAULT_SYSROOT:STRING="../target/hexagon-unknown-linux-musl/" \
 		-DLLVM_ENABLE_PROJECTS:STRING="clang;lld" \
 		../llvm-project/llvm
  	ninja all install
@@ -27,11 +32,6 @@ build_llvm_clang() {
 	ln -sf llvm-objcopy hexagon-unknown-linux-musl-objcopy
 	ln -sf llvm-readelf hexagon-unknown-linux-musl-readelf
 	ln -sf llvm-ranlib hexagon-unknown-linux-musl-ranlib
-
-	# workaround for now:
-	cat <<EOF > hexagon-unknown-linux-musl.cfg
--G0 --sysroot=${HEX_SYSROOT}
-EOF
 }
 
 build_clang_rt() {
@@ -104,9 +104,12 @@ config_kernel() {
 	mkdir -p obj_linux
 	cd linux
 	make O=../obj_linux ARCH=hexagon \
-		KBUILD_CFLAGS_KERNEL="-mlong-calls" \
-	       	CC=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/hexagon-unknown-linux-musl-clang \
-	       	LD=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/ld.lld \
+		CROSS_COMPILE=hexagon-unknown-linux-musl- \
+		CC=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/clang \
+		AS=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/clang \
+		LD=${TOOLCHAIN_INSTALL}/x86_64-linux-gnu/bin/ld.lld \
+		LLVM=1 \
+		LLVM_IAS=1 \
 		KBUILD_VERBOSE=1 comet_defconfig
 }
 build_kernel() {
