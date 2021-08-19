@@ -15,7 +15,7 @@ build_llvm_clang() {
 		-DLLVM_ENABLE_LIBCXX:BOOL=ON \
 		-DLLVM_ENABLE_ASSERTIONS:BOOL=ON \
 		-DLLVM_ENABLE_PIC:BOOL=OFF \
-		-DLLVM_TARGETS_TO_BUILD:STRING="X86;Hexagon" \
+		-DLLVM_TARGETS_TO_BUILD:STRING="Hexagon" \
 		-DLLVM_DEFAULT_TARGET_TRIPLE:STRING="hexagon-unknown-musl-linux" \
 		-DCLANG_DEFAULT_CXX_STDLIB:STRING="libc++" \
 		-DCLANG_DEFAULT_OBJCOPY:STRING="llvm-objcopy" \
@@ -41,10 +41,12 @@ build_clang_rt() {
 	cmake -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_CONFIG_PATH:PATH=../obj_llvm/bin/llvm-config \
-		-DCMAKE_ASM_FLAGS:STRING="-G0 -mlong-calls -fno-pic --target=hexagon-unknown-linux-musl " \
+		-DCMAKE_ASM_FLAGS:STRING="-G0 -mlong-calls -fno-pic" \
 		-DCMAKE_SYSTEM_NAME:STRING=Linux \
 		-DCMAKE_C_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
 		-DCMAKE_ASM_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
+		-DCOMPILER_RT_EMULATOR:STRING="${TOOLCHAIN_BIN}/qemu_wrapper.sh" \
+		-DCOMPILER_RT_CAN_EXECUTE_TESTS:BOOL=ON \
 		-DCMAKE_INSTALL_PREFIX:PATH=${HEX_TOOLS_TARGET_BASE} \
 		-DCMAKE_CROSSCOMPILING:BOOL=ON \
 		-DCMAKE_C_COMPILER_FORCED:BOOL=ON \
@@ -58,9 +60,37 @@ build_clang_rt() {
 		-DCOMPILER_RT_SUPPORTED_ARCH=hexagon \
 		-DLLVM_ENABLE_PROJECTS:STRING="compiler-rt" \
 		../llvm-project/compiler-rt
-	ninja install-compiler-rt
+	ninja install-builtins
 }
 
+build_sanitizers() {
+	cd ${BASE}
+	mkdir -p obj_san
+	cd obj_san
+	cmake -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DLLVM_CONFIG_PATH:PATH=../obj_llvm/bin/llvm-config \
+		-DCMAKE_ASM_FLAGS:STRING="-G0 -mlong-calls" \
+		-DCMAKE_SYSTEM_NAME:STRING=Linux \
+		-DCMAKE_C_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
+		-DCMAKE_ASM_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
+		-DCOMPILER_RT_EMULATOR:STRING="${TOOLCHAIN_BIN}/qemu_wrapper.sh" \
+		-DCOMPILER_RT_CAN_EXECUTE_TESTS:BOOL=ON \
+		-DCMAKE_INSTALL_PREFIX:PATH=${HEX_TOOLS_TARGET_BASE} \
+		-DCMAKE_CROSSCOMPILING:BOOL=ON \
+		-DCMAKE_C_COMPILER_FORCED:BOOL=ON \
+		-DCMAKE_CXX_COMPILER_FORCED:BOOL=ON \
+		-DCOMPILER_RT_BUILD_BUILTINS:BOOL=OFF \
+		-DCOMPILER_RT_BUILTINS_ENABLE_PIC:BOOL=OFF \
+		-DCMAKE_SIZEOF_VOID_P=4 \
+		-DCOMPILER_RT_OS_DIR= \
+		-DCAN_TARGET_hexagon=1 \
+		-DCAN_TARGET_x86_64=0 \
+		-DCOMPILER_RT_SUPPORTED_ARCH=hexagon \
+		-DLLVM_ENABLE_PROJECTS:STRING="compiler-rt" \
+		../llvm-project/compiler-rt
+	ninja install-compiler-rt
+}
 
 build_canadian_clang() {
 	cd ${BASE}
@@ -240,9 +270,9 @@ build_libs() {
 		-DLIBCXXABI_ENABLE_SHARED:BOOL=ON \
 		-DCMAKE_CXX_COMPILER_FORCED:BOOL=ON \
 		../llvm-project/llvm
-	ninja -v install-unwind
-	ninja -v install-cxxabi
-	ninja -v install-cxx
+	ninja install-unwind
+	ninja install-cxxabi
+	ninja install-cxx
 }
 
 build_qemu() {
@@ -417,6 +447,7 @@ test_qemu
 
 
 build_libs
+build_sanitizers
 
 cp -ra ${HEX_SYSROOT}/usr ${ROOTFS}/
 
