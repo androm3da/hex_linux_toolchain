@@ -44,6 +44,7 @@ build_clang_rt() {
 		-DCMAKE_ASM_FLAGS:STRING="-G0 -mlong-calls -fno-pic" \
 		-DCMAKE_SYSTEM_NAME:STRING=Linux \
 		-DCMAKE_C_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
+		-DCMAKE_CXX_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang++" \
 		-DCMAKE_ASM_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
 		-DCOMPILER_RT_EMULATOR:STRING="${TOOLCHAIN_BIN}/qemu_wrapper.sh" \
 		-DCOMPILER_RT_CAN_EXECUTE_TESTS:BOOL=ON \
@@ -58,7 +59,6 @@ build_clang_rt() {
 		-DCAN_TARGET_hexagon=1 \
 		-DCAN_TARGET_x86_64=0 \
 		-DCOMPILER_RT_SUPPORTED_ARCH=hexagon \
-		-DLLVM_ENABLE_PROJECTS:STRING="compiler-rt" \
 		../llvm-project/compiler-rt
 	ninja install-builtins
 }
@@ -73,6 +73,7 @@ build_sanitizers() {
 		-DCMAKE_ASM_FLAGS:STRING="-G0 -mlong-calls" \
 		-DCMAKE_SYSTEM_NAME:STRING=Linux \
 		-DCMAKE_C_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
+		-DCMAKE_CXX_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang++" \
 		-DCMAKE_ASM_COMPILER:STRING="${TOOLCHAIN_BIN}/hexagon-unknown-linux-musl-clang" \
 		-DCOMPILER_RT_EMULATOR:STRING="${TOOLCHAIN_BIN}/qemu_wrapper.sh" \
 		-DCOMPILER_RT_CAN_EXECUTE_TESTS:BOOL=ON \
@@ -87,7 +88,6 @@ build_sanitizers() {
 		-DCAN_TARGET_hexagon=1 \
 		-DCAN_TARGET_x86_64=0 \
 		-DCOMPILER_RT_SUPPORTED_ARCH=hexagon \
-		-DLLVM_ENABLE_PROJECTS:STRING="compiler-rt" \
 		../llvm-project/compiler-rt
 	ninja install-compiler-rt
 }
